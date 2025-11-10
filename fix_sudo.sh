@@ -1,8 +1,13 @@
 #!/bin/bash
 # Termux Root Fix Tool — updated for Gtajisan (Farhan)
-# Version: 1.1
+# Version: 1.2
 # Maintainer: Gtajisan (Farhan)
+# Changelog:
+# - Added support for /system/product/bin/su
+# - Improved su path search and validation
+# - Cleaned up redundant messages
 
+# ════════════════════════════════════════════════════
 # Color palette
 BOLD="\e[1m"
 RESET="\e[0m"
@@ -55,6 +60,21 @@ echo ""
 
 # 4. Retest root access (safe)
 step 4 "Retesting root access (safe check)..."
+
+# Expanded SU search paths
+SU_SEARCH_PATHS=(
+  /system/bin/su
+  /debug_ramdisk/su
+  /system/xbin/su
+  /sbin/su
+  /sbin/bin/su
+  /system/sbin/su
+  /su/xbin/su
+  /su/bin/su
+  /magisk/.core/bin/su
+  /system/product/bin/su   # newly added path
+)
+
 root_check() {
   # If already root
   if [ "$(id -u 2>/dev/null)" = "0" ]; then
@@ -62,49 +82,34 @@ root_check() {
     return 0
   fi
 
-  # Try passwordless sudo check (won't prompt for password due to -n)
+  # Try passwordless sudo
   if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
     whoami_out="$(sudo whoami 2>/dev/null || true)"
     echo -e "${GREEN}✓ sudo is available — remote identity: ${whoami_out}${RESET}"
     return 0
   fi
 
-  # If sudo exists but requires password, inform user and offer to open a shell
-  if command -v sudo >/dev/null 2>&1; then
-    echo -e "${YELLOW}! sudo is installed but requires a password or interaction.${RESET}"
-    read -p "[?] Drop to a root shell now using 'sudo su'? (y/N): " reply
-    reply="${reply:-n}"
-    if [[ "$reply" =~ ^[Yy]$ ]]; then
-      echo -e "${CYAN}Launching: sudo su${RESET}"
-      exec sudo su
-      # exec replaces the script; if it returns, continue
-    else
-      echo -e "${YELLOW}→ Skipping interactive root shell. You can run 'sudo su' yourself.${RESET}"
-    fi
-    return 1
-  fi
-
-  # Try su if available (some rooted devices)
-  if command -v su >/dev/null 2>&1; then
-    echo -e "${YELLOW}! 'su' binary found — attempting a non-interactive uid check...${RESET}"
-    if su -c 'id -u' >/dev/null 2>&1; then
-      echo -e "${GREEN}✓ 'su' worked — you can use su to gain root.${RESET}"
-      read -p "[?] Open an interactive root shell with 'su -c \"sh\"'? (y/N): " r2
-      r2="${r2:-n}"
-      if [[ "$r2" =~ ^[Yy]$ ]]; then
-        exec su -c "sh"
-      else
-        echo -e "${YELLOW}→ Skipping interactive root shell. You can run 'su' yourself.${RESET}"
+  # Try to find any working 'su' in known paths
+  echo -e "${CYAN}→ Searching for working 'su' binary...${RESET}"
+  for su_path in "${SU_SEARCH_PATHS[@]}"; do
+    if [ -x "$su_path" ]; then
+      echo -e "${YELLOW}• Found su: ${su_path}${RESET}"
+      if "$su_path" -c "id -u" >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ su binary at ${su_path} works for root access.${RESET}"
+        read -p "[?] Launch root shell now using '${su_path} -c sh'? (y/N): " ans
+        ans="${ans:-n}"
+        if [[ "$ans" =~ ^[Yy]$ ]]; then
+          exec "$su_path" -c "sh"
+        else
+          echo -e "${YELLOW}→ You can manually run: ${su_path} -c sh${RESET}"
+        fi
+        return 0
       fi
-      return 0
-    else
-      echo -e "${RED}✗ 'su' present but failed to elevate (or requires interaction).${RESET}"
-      return 1
     fi
-  fi
+  done
 
-  echo -e "${RED}✗ No interactive root method detected (sudo/su not available or restricted).${RESET}"
-  echo -e "${YELLOW}→ If your device is rooted, ensure a su provider (Magisk/SuperSU) is installed and try again.${RESET}"
+  echo -e "${RED}✗ No working su binary detected in known locations.${RESET}"
+  echo -e "${YELLOW}→ Ensure Magisk or another su provider is properly installed.${RESET}"
   return 1
 }
 
