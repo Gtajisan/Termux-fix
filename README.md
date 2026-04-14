@@ -45,3 +45,5 @@ curl -sL https://raw.githubusercontent.com/Gtajisan/Termux-fix/main/fix_sudo.sh 
 
 ---
 
+# credit 
+- source by @anbuinfosec
