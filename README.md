@@ -45,13 +45,3 @@ curl -sL https://raw.githubusercontent.com/Gtajisan/Termux-fix/main/fix_sudo.sh 
 
 ---
 
-## 👤 Maintainer
-
-**Gtajisan (Farhan)**
-[GitHub Profile](https://github.com/Gtajisan)
-
----
-
-## 📄 License
-
-This project is released under the **MIT License** — see [LICENSE](LICENSE) for details.
